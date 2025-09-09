@@ -210,8 +210,52 @@ tibble(
 cat(sprintf("Variance Reduction: %.1f%%\n", VR)) # Variance Reduction: 99%, 0.1% of the variance is uncorrelated to the plain MC
 
 # d) CI 
+CV_Price <- function(M,N,sigma, seed=1){
+  set.seed(seed)
+  dt<- Time_T/N
+  S_Paths <- GBM(M,N,dt,S0,r,sigma)
+  S_grid <- S_Paths[,-1,drop = FALSE]
+  S_T <- S_grid[,N]
+  S_Bar <- rowMeans(S_grid)
+  X<- exp(-r * Time_T) * pmax(S_T -S_Bar,0)
+  
+  G <- exp(rowMeans(log(S_grid)))
+  Y <- exp(-r *Time_T) * pmax(S_T - G, 0)
+  MuY <- Asian_Call(S0, r, sigma, Time_T, N)
+  
+  theta <- cov(X,Y)/var(Y)
+  z <- X + theta * (MuY - Y)
+  
+  c(MC = mean(X), SE_MC = sd(X)/sqrt(M),
+  CV = mean(z), SE_Cv = sd(z)/sqrt(M)
+  )
+}
 
+Ms <- round(exp(seq(log(1e3), log(1e5), length.out = 6)))
+res_m <- map_dfr(Ms, \(m) {
+  out <- CV_Price(M = m, N = N, sigma = sigma, seed = 123)
+  tibble(
+    M = m,
+    mc_low = out["MC"] - 1.96 * out["SE_MC"],
+    mc_high = out["MC"] + 1.96 * out["SE_MC"],
+    cv_low = out["CV"] - 1.96 * out["SE_Cv"],
+    cv_high = out["CV"] + 1.96 * out["SE_Cv"]
+  )
+})
 
+res_m |>
+  mutate(
+    width_mc = mc_high - mc_low,
+    width_cv = cv_high - cv_low
+  ) |>
+  pivot_longer(starts_with("width_"), names_to = "method", values_to = "width") |>
+  mutate(method = recode(method, width_mc = "Plain MC", width_cv = "Control variate")) |>
+  ggplot(aes(x = M, y = width, color = method)) +
+  geom_line() + geom_point() +
+  scale_x_log10() +
+  labs(title = "95% CI width vs simulations M",
+       x = "log scale", y = "CI width") +
+  theme_minimal()
 
 
 
