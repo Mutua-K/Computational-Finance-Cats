@@ -1,3 +1,11 @@
+---
+title: "Cat_2"
+author: "Joy Kendi"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
 library(tidyverse)
 
 S0 <- 100
@@ -67,4 +75,7 @@ ggplot(result, aes(x = M, y = MC_Price)) +
     y = "Price (95% CI)"
   ) +
   theme_minimal()
+
+
+```
 
